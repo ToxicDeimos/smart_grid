@@ -10,10 +10,9 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 
-# Datos cacheados y logs (no versionar)
-data/
-logs/
-*.csv
+# Datos cacheados y logs (no versionar) — anclados a la raiz para no ignorar src/data/
+/data/
+/logs/
 
 # Secretos
 .env
