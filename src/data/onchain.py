@@ -1,6 +1,7 @@
 """Datos on-chain de fuentes gratuitas (sin API key).
 
-- Coin Metrics Community API v4: market cap, realized cap, supply, precio.
+- bitcoin-data.com (BGeometrics): MVRV Z-Score y Realized Price. Hasta ~15 req/dia sin
+  token, que con el cache local (12h) es mas que suficiente.
 - blockchain.info charts: hashrate y miners revenue (para Hash Ribbons y Puell).
 """
 from __future__ import annotations
@@ -11,46 +12,38 @@ import requests
 from src.config import load_config
 from src.data.cache import load_cached, save_cached
 
-_CM_URL = "https://community-api.coinmetrics.io/v4/timeseries/asset-metrics"
+_BD_URL = "https://bitcoin-data.com/v1/{metric}"
 _BC_URL = "https://api.blockchain.info/charts/{chart}"
-_HEADERS = {"User-Agent": "smart_grid/0.1 (https://github.com/ToxicDeimos/smart_grid)"}
+_HEADERS = {
+    "User-Agent": "smart_grid/0.1 (https://github.com/ToxicDeimos/smart_grid)",
+    "accept": "application/json",
+}
 
 
-def fetch_coinmetrics(metrics: list[str], asset: str = "btc", use_cache: bool = True) -> pd.DataFrame:
-    """Descarga metricas de Coin Metrics Community (paginado) como DataFrame por fecha."""
+def fetch_bitcoin_data(metric: str, value_field: str, use_cache: bool = True) -> pd.Series:
+    """Serie historica de una metrica de bitcoin-data.com (sin API key).
+
+    Args:
+        metric: ruta del endpoint, p.ej. "mvrv-zscore" o "realized-price".
+        value_field: nombre del campo de valor en el JSON, p.ej. "mvrvZscore".
+    """
     cfg = load_config()
-    key = f"coinmetrics_{asset}_{'-'.join(metrics)}"
+    key = f"bitcoindata_{metric}"
     if use_cache:
         c = load_cached(key, cfg["data"]["cache_ttl_hours"])
         if c is not None and not c.empty:
-            return c
+            return c.iloc[:, 0]
 
-    params = {
-        "assets": asset,
-        "metrics": ",".join(metrics),
-        "frequency": "1d",
-        "page_size": 10000,
-        "start_time": cfg["data"]["history_start"],
-    }
-    rows: list = []
-    url = _CM_URL
-    while url:
-        r = requests.get(url, params=params, headers=_HEADERS, timeout=30)
-        r.raise_for_status()
-        j = r.json()
-        rows.extend(j.get("data", []))
-        url = j.get("next_page_url")
-        params = None  # next_page_url ya incluye los parametros
-
-    if not rows:
-        return pd.DataFrame()
-    df = pd.DataFrame(rows)
-    df["date"] = pd.to_datetime(df["time"], utc=True).dt.normalize()
-    df = df.set_index("date").drop(columns=["asset", "time"], errors="ignore")
-    df = df.apply(pd.to_numeric, errors="coerce")
-    if use_cache:
-        save_cached(key, df)
-    return df
+    r = requests.get(_BD_URL.format(metric=metric), headers=_HEADERS, timeout=30)
+    r.raise_for_status()
+    data = r.json()
+    s = pd.Series(
+        {pd.to_datetime(row["d"], utc=True): float(row[value_field]) for row in data},
+        name=value_field,
+    ).sort_index()
+    if use_cache and not s.empty:
+        save_cached(key, s.to_frame())
+    return s
 
 
 def fetch_blockchain_chart(chart: str, use_cache: bool = True) -> pd.Series:
@@ -83,22 +76,18 @@ def fetch_blockchain_chart(chart: str, use_cache: bool = True) -> pd.Series:
 
 
 def get_valuation() -> pd.DataFrame:
-    """Market cap, realized cap, supply, precio, realized price y MVRV Z-Score."""
+    """MVRV Z-Score y Realized Price (bitcoin-data.com).
+
+    Devuelve un DataFrame por fecha con columnas 'mvrv_z' y 'realized_price'. Si la
+    fuente no esta disponible, devuelve un DataFrame vacio y esas senales se omiten
+    del score (renormalizacion de pesos).
+    """
     try:
-        df = fetch_coinmetrics(["CapMrktCurUSD", "CapRealUSD", "SplyCur", "PriceUSD"])
+        mvrv_z = fetch_bitcoin_data("mvrv-zscore", "mvrvZscore")
+        realized = fetch_bitcoin_data("realized-price", "realizedPrice")
     except Exception:
-        # Fuente no disponible (p.ej. 403 / requiere key). Las senales MVRV y Realized
-        # Price se omitiran del score por falta de datos (renormalizacion de pesos).
         return pd.DataFrame()
-    if df.empty:
-        return df
-    df = df.dropna(subset=["CapMrktCurUSD", "CapRealUSD", "SplyCur"])
-    df["realized_price"] = df["CapRealUSD"] / df["SplyCur"]
-    df["mvrv"] = df["CapMrktCurUSD"] / df["CapRealUSD"]
-    # MVRV Z-Score = (market cap - realized cap) / std(market cap)
-    std = df["CapMrktCurUSD"].std()
-    df["mvrv_z"] = (df["CapMrktCurUSD"] - df["CapRealUSD"]) / std
-    return df
+    return pd.DataFrame({"mvrv_z": mvrv_z, "realized_price": realized}).dropna(how="all")
 
 
 def get_hashrate() -> pd.Series:

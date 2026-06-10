@@ -26,20 +26,22 @@ CASES = {
 }
 
 
-def _score_as_of(ts, daily, hr_full, mr_full, cfg):
+def _score_as_of(ts, daily, val_full, hr_full, mr_full, cfg):
     d = daily.loc[:ts]
     if len(d) < 220:
         return None, None, None
     w, m = weekly(d), monthly(d)
+    val = val_full.loc[:ts] if len(val_full) else val_full
     hr = hr_full.loc[:ts] if len(hr_full) else hr_full
     mr = mr_full.loc[:ts] if len(mr_full) else mr_full
-    score, signals = compute_all(d, w, m, pd.DataFrame(), hr, mr, cfg)
+    score, signals = compute_all(d, w, m, val, hr, mr, cfg)
     return score, float(d["close"].iloc[-1]), [s.name for s in signals if s.in_floor_zone]
 
 
 def main() -> None:
     cfg = load_config()
     daily = fetch_ohlcv(timeframe="1d")
+    val_full = onchain.get_valuation()
     hr_full = onchain.get_hashrate()
     mr_full = onchain.get_miners_revenue()
 
@@ -48,14 +50,14 @@ def main() -> None:
     print("=" * 66)
     for label, date in CASES.items():
         ts = pd.Timestamp(date, tz="UTC")
-        score, price, active = _score_as_of(ts, daily, hr_full, mr_full, cfg)
+        score, price, active = _score_as_of(ts, daily, val_full, hr_full, mr_full, cfg)
         if score is None:
             print(f"  {label}:  datos insuficientes")
             continue
         print(f"  {label}   BTC ${price:>9,.0f}   ->   score {score.score:>5.1f}/100   "
               f"({len(active)} senales: {', '.join(active) if active else '-'})")
     print("-" * 66)
-    score, price, active = _score_as_of(daily.index[-1], daily, hr_full, mr_full, cfg)
+    score, price, active = _score_as_of(daily.index[-1], daily, val_full, hr_full, mr_full, cfg)
     print(f"  Hoy {daily.index[-1].date()}   BTC ${price:>9,.0f}   ->   score {score.score:>5.1f}/100")
     print("=" * 66)
     print("  N pequeno (3-4 ciclos): sanity-check, NO validacion estadistica.")
