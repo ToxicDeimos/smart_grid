@@ -43,12 +43,34 @@ def _atr(df: pd.DataFrame, period: int = 14) -> pd.Series:
     return tr.ewm(alpha=1 / period, adjust=False).mean()
 
 
-def _round_to(x: float, step: float = 100.0) -> float:
+def _price_step(price: float) -> float:
+    """Step de redondeo adaptado a la escala del precio (~3 cifras significativas).
+
+    BTC (~$60k) -> 100 ; ETH (~$3k) -> 10 ; XRP (~$2.5) -> 0.01. Evita que los niveles
+    de activos de bajo precio colapsen a 0 (que provocaba una division por cero).
+    """
+    if price <= 0:
+        return 1.0
+    return 10.0 ** (math.floor(math.log10(price)) - 2)
+
+
+def _round_to(x: float, step: float) -> float:
     return round(x / step) * step
+
+
+def _fmt(x: float) -> str:
+    """Formato de precio legible adaptado a la escala (para los avisos)."""
+    if abs(x) >= 1000:
+        return f"{x:,.0f}"
+    if abs(x) >= 1:
+        return f"{x:,.2f}"
+    return f"{x:,.4f}"
 
 
 def _grids_for_range(lower: float, upper: float, net_pct: float, fee: float) -> int:
     """Numero de grids para ~net_pct neto por grid (espaciado geometrico)."""
+    if lower <= 0 or upper <= lower:
+        return 2
     spacing = net_pct + 2 * fee          # bruto = neto objetivo + fees de ida y vuelta
     n = math.log(upper / lower) / math.log(1 + spacing)
     return max(2, int(n))
@@ -57,6 +79,7 @@ def _grids_for_range(lower: float, upper: float, net_pct: float, fee: float) -> 
 def optimize(daily: pd.DataFrame, decision: BotDecision, bottom: BottomScore,
              capital: float, cfg: dict) -> GridPlan:
     price = float(daily["close"].iloc[-1])
+    step = _price_step(price)
     atr = float(_atr(daily, cfg["grid"]["atr_period"]).iloc[-1])
     lookback = cfg["grid"]["swing_lookback"]
     swing_low = float(daily["low"].tail(lookback).min())
@@ -71,26 +94,26 @@ def optimize(daily: pd.DataFrame, decision: BotDecision, bottom: BottomScore,
     warnings: list[str] = []
 
     if side == "long":
-        lower = _round_to(swing_low)
-        upper = _round_to(max(swing_high, price + 2 * atr))
+        lower = _round_to(swing_low, step)
+        upper = _round_to(max(swing_high, price + 2 * atr), step)
         if bottom.score >= 65:
             trigger = None                      # activar ya
             liq_entry = price
         else:
-            trigger = _round_to(swing_low + 0.25 * (price - swing_low))  # esperar caida al soporte
+            trigger = _round_to(swing_low + 0.25 * (price - swing_low), step)  # esperar caida
             liq_entry = trigger
-        stop_loss = _round_to(lower * 0.97)
+        stop_loss = _round_to(lower * 0.97, step)
         take_profit = upper
     elif side == "short":
-        upper = _round_to(swing_high)
-        lower = _round_to(min(swing_low, price - 2 * atr))
-        trigger = _round_to(swing_high - 0.25 * (swing_high - price))
+        upper = _round_to(swing_high, step)
+        lower = _round_to(min(swing_low, price - 2 * atr), step)
+        trigger = _round_to(swing_high - 0.25 * (swing_high - price), step)
         liq_entry = trigger
-        stop_loss = _round_to(upper * 1.03)
+        stop_loss = _round_to(upper * 1.03, step)
         take_profit = lower
     else:  # neutral
-        lower = _round_to(price - 2 * atr)
-        upper = _round_to(price + 2 * atr)
+        lower = _round_to(price - 2 * atr, step)
+        upper = _round_to(price + 2 * atr, step)
         trigger = None
         liq_entry = price
         stop_loss = None
@@ -106,8 +129,8 @@ def optimize(daily: pd.DataFrame, decision: BotDecision, bottom: BottomScore,
     bear_hi, bear_lo = ath * 0.35, ath * 0.15
     if side in ("long", "neutral") and bear_lo <= liq.liq_price <= bear_hi:
         warnings.append(
-            f"La liquidacion (${liq.liq_price:,.0f}) cae en la zona de suelo de bear historica "
-            f"(${bear_lo:,.0f}-${bear_hi:,.0f}): a {lev:.0f}x te sacaria cerca del fondo."
+            f"La liquidacion (${_fmt(liq.liq_price)}) cae en la zona de suelo de bear historica "
+            f"(${_fmt(bear_lo)}-${_fmt(bear_hi)}): a {lev:.0f}x te sacaria cerca del fondo."
         )
     if lev <= cfg["pionex"]["min_leverage"]:
         warnings.append(

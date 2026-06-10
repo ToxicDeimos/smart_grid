@@ -16,13 +16,21 @@ _DISCLAIMER = (
 
 
 def _money(x: float | None) -> str:
-    return f"${x:,.0f}" if x is not None else "-"
+    """Formato de precio con decimales adaptados a la escala (BTC vs alts baratos)."""
+    if x is None:
+        return "-"
+    if abs(x) >= 1000:
+        return f"${x:,.0f}"
+    if abs(x) >= 1:
+        return f"${x:,.2f}"
+    return f"${x:,.4f}"
 
 
 def to_dict(price: float, regime: Regime, bottom: BottomScore, decision: BotDecision,
-            plan: GridPlan, signals: list[Signal]) -> dict:
+            plan: GridPlan, signals: list[Signal], symbol: str = "BTC/USDT") -> dict:
     return {
-        "price": round(price, 2),
+        "symbol": symbol,
+        "price": round(price, 6),
         "regime": {"trend": regime.trend, "adx": regime.adx},
         "bottom_score": {
             "score": bottom.score, "label": bottom.label,
@@ -49,17 +57,17 @@ def to_dict(price: float, regime: Regime, bottom: BottomScore, decision: BotDeci
     }
 
 
-def to_json(*args) -> str:
-    return json.dumps(to_dict(*args), indent=2, ensure_ascii=False)
+def to_json(*args, **kwargs) -> str:
+    return json.dumps(to_dict(*args, **kwargs), indent=2, ensure_ascii=False)
 
 
 def to_text(price: float, regime: Regime, bottom: BottomScore, decision: BotDecision,
-            plan: GridPlan, signals: list[Signal]) -> str:
+            plan: GridPlan, signals: list[Signal], symbol: str = "BTC/USDT") -> str:
     liq = plan.liquidation.liq_price
     trig = "al precio actual" if plan.entry_trigger is None else _money(plan.entry_trigger)
     lines = [
         "=" * 66,
-        f"  RECOMENDACION DE GRID  -  BTC {_money(price)}",
+        f"  RECOMENDACION DE GRID  -  {symbol}  {_money(price)}",
         "=" * 66,
         f"  Regimen:          {regime.trend.upper()} (ADX {regime.adx})",
         f"  Score de suelo:   {bottom.score}/100 - {bottom.label}",
@@ -90,11 +98,11 @@ def to_text(price: float, regime: Regime, bottom: BottomScore, decision: BotDeci
 
 
 def to_markdown(price: float, regime: Regime, bottom: BottomScore, decision: BotDecision,
-                plan: GridPlan, signals: list[Signal]) -> str:
+                plan: GridPlan, signals: list[Signal], symbol: str = "BTC/USDT") -> str:
     liq = plan.liquidation.liq_price
     trig = "al precio actual" if plan.entry_trigger is None else _money(plan.entry_trigger)
     md = [
-        f"# Recomendacion de grid — BTC {_money(price)}",
+        f"# Recomendacion de grid — {symbol} {_money(price)}",
         "",
         f"- **Regimen:** {regime.trend} (ADX {regime.adx})",
         f"- **Score de suelo:** {bottom.score}/100 — {bottom.label}",

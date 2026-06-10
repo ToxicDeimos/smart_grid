@@ -82,7 +82,7 @@
         <div class="gauge-score" id="scoreNum">–</div>
         <div class="gauge-label" id="scoreLabel"></div>
         <div style="margin-top:14px;text-align:left;">
-          <div class="meta-row"><span class="k">Precio</span><span id="price">–</span></div>
+          <div class="meta-row"><span class="k" id="symLabel">Precio</span><span id="price">–</span></div>
           <div class="meta-row"><span class="k">Fecha</span><span id="date">–</span></div>
           <div class="meta-row"><span class="k">Regimen</span><span id="regime">–</span></div>
           <div class="meta-row"><span class="k">Senales en suelo</span><span id="activeCount">–</span></div>
@@ -133,7 +133,11 @@
 
 <script>
 const $ = (id) => document.getElementById(id);
-const money = (x) => (x === null || x === undefined) ? "–" : "$" + Math.round(x).toLocaleString("en-US");
+const money = (x) => {
+  if (x === null || x === undefined) return "–";
+  const d = Math.abs(x) >= 1000 ? 0 : Math.abs(x) >= 1 ? 2 : 4;
+  return "$" + x.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+};
 
 function gaugeColor(s) {
   if (s >= 75) return "#2ea043";
@@ -232,6 +236,7 @@ async function analyze() {
 
     renderGauge(d.bottom_score.score);
     $("scoreLabel").textContent = d.bottom_score.label;
+    $("symLabel").textContent = d.symbol || "Precio";
     $("price").textContent = money(d.price);
     $("date").textContent = d.date;
     const reg = $("regime"); reg.textContent = d.regime.trend + " (ADX " + d.regime.adx + ")";
