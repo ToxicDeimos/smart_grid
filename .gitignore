@@ -13,7 +13,7 @@ __pycache__/
 # Datos cacheados y logs (no versionar)
 data/
 logs/
-*.parquet
+*.csv
 
 # Secretos
 .env
