@@ -3,6 +3,12 @@
 Usa el modelo derivado durante el diseno: la posicion inicial abierta al activar el
 grid es la fraccion del rango que queda en la direccion de las ordenes de salida, y la
 liquidacion se estima con el precio medio de entrada cuando el grid esta lleno.
+
+- long  : riesgo a la BAJA (el precio cae hasta 'lower' con la posicion larga abierta).
+- short : riesgo al ALZA (el precio sube hasta 'upper').
+- neutral: riesgo BILATERAL — longs por debajo (liquidacion a la baja) y shorts por
+  encima (liquidacion al alza). Al estar parcialmente cubierto, su riesgo direccional
+  real es MENOR que el de un grid puro; los valores aqui son una referencia conservadora.
 """
 from __future__ import annotations
 
@@ -13,18 +19,15 @@ from dataclasses import dataclass
 class GridLiquidation:
     side: str
     avg_entry: float
-    liq_price: float
-    initial_fraction: float   # fraccion del nocional abierta al activar el grid
+    liq_price: float                   # liquidacion principal: caida (long/neutral) o subida (short)
+    initial_fraction: float            # fraccion del nocional abierta al activar el grid
     leverage: float
+    direction: str = "down"            # "down" (long), "up" (short), "both" (neutral)
+    liq_price_up: float | None = None  # solo neutral: liquidacion al alza (lado short)
 
 
 def initial_fraction(entry: float, lower: float, upper: float, side: str = "long") -> float:
-    """Fraccion del nocional que se abre como posicion inicial al activar el grid.
-
-    En un grid long, para poder vender en las subidas el bot abre de entrada el inventario
-    de todas las ordenes de venta por encima del precio de activacion. Cuanto mas alto el
-    techo respecto al precio de entrada, mayor la posicion inicial (y la liquidacion sube).
-    """
+    """Fraccion del nocional que se abre como posicion inicial al activar el grid."""
     span = upper - lower
     if span <= 0:
         return 1.0
@@ -34,26 +37,29 @@ def initial_fraction(entry: float, lower: float, upper: float, side: str = "long
 
 def estimate(side: str, lower: float, upper: float, leverage: float,
              entry: float | None = None, mmr: float = 0.005) -> GridLiquidation:
-    """Estima la liquidacion del grid cuando esta completamente desplegado (peor caso).
-
-    long  : precio cae hasta 'lower'; entrada media = (activacion + lower)/2.
-    short : precio sube hasta 'upper'; entrada media = (activacion + upper)/2.
-    neutral: se reporta el lado largo (caida) como referencia conservadora.
-    """
+    """Estima la liquidacion del grid cuando esta completamente desplegado (peor caso)."""
     if side == "long":
         entry = entry if entry is not None else upper
         avg = (entry + lower) / 2
         liq = avg * (1 - 1 / leverage + mmr)
         frac = initial_fraction(entry, lower, upper, "long")
-    elif side == "short":
+        return GridLiquidation("long", round(avg, 2), round(liq, 2), round(frac, 3),
+                               leverage, "down", None)
+
+    if side == "short":
         entry = entry if entry is not None else lower
         avg = (entry + upper) / 2
         liq = avg * (1 + 1 / leverage - mmr)
         frac = initial_fraction(entry, lower, upper, "short")
-    else:  # neutral
-        entry = entry if entry is not None else (upper + lower) / 2
-        avg = entry
-        liq = ((entry + lower) / 2) * (1 - 1 / leverage + mmr)
-        frac = initial_fraction(entry, lower, upper, "long")
+        return GridLiquidation("short", round(avg, 2), round(liq, 2), round(frac, 3),
+                               leverage, "up", None)
 
-    return GridLiquidation(side, round(avg, 2), round(liq, 2), round(frac, 3), leverage)
+    # neutral: longs por debajo del centro, shorts por encima -> riesgo en ambos extremos
+    entry = entry if entry is not None else (upper + lower) / 2
+    avg_long = (entry + lower) / 2
+    avg_short = (entry + upper) / 2
+    liq_down = avg_long * (1 - 1 / leverage + mmr)
+    liq_up = avg_short * (1 + 1 / leverage - mmr)
+    frac = initial_fraction(entry, lower, upper, "long")
+    return GridLiquidation("neutral", round(entry, 2), round(liq_down, 2), round(frac, 3),
+                           leverage, "both", round(liq_up, 2))

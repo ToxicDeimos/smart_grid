@@ -22,3 +22,11 @@ def test_short_liquidates_above_entry():
 
 def test_initial_fraction_midpoint():
     assert abs(initial_fraction(60000, 40000, 80000, "long") - 0.5) < 1e-9
+
+
+def test_neutral_is_bilateral():
+    liq = estimate("neutral", lower=56000, upper=66000, leverage=3, entry=61000, mmr=0.005)
+    assert liq.direction == "both"
+    assert liq.liq_price_up is not None
+    assert liq.liq_price < liq.avg_entry       # liquidacion a la baja (lado long)
+    assert liq.liq_price_up > liq.avg_entry    # liquidacion al alza (lado short)
