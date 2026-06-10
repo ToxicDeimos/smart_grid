@@ -34,6 +34,7 @@ signals:
   mvrv_z_floor: 0.50               # MVRV Z-Score < 0.50 => zona verde
   realized_price_ratio_floor: 1.0  # precio/realized < 1 => capitulacion
   puell_floor: 0.50                # Puell Multiple < 0.50 => suelo
+  bitcoin_bottom_threshold: 60     # (alts) score de suelo de BTC requerido para considerar suelo
   # Hash Ribbons y BMSB son senales booleanas (cruce / perdida-recuperacion)
 
 # ------------------------------------------------------------
@@ -49,6 +50,7 @@ weights:
   realized_price: 15
   hash_ribbons: 8
   puell: 7
+  bitcoin_bottom: 30   # (solo alts) peso alto: el suelo de BTC es prerequisito del suelo de un alt
 
 # Etiquetas cualitativas segun score
 score_labels:
@@ -64,3 +66,5 @@ grid:
   min_net_pct_per_grid: 0.003   # ganancia neta objetivo por grid (0.3%) tras fees
   atr_period: 14
   swing_lookback: 90            # barras para detectar swing highs/lows
+  sl_pct: 0.05                  # Stop Loss: margen bajo el limite del rango
+  tp_pct: 0.05                  # Take Profit: margen sobre el limite del rango

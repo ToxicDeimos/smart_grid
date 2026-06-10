@@ -12,8 +12,6 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import pandas as pd  # noqa: E402
-
 from src import report  # noqa: E402
 from src.config import load_config  # noqa: E402
 from src.data import onchain  # noqa: E402
@@ -21,7 +19,7 @@ from src.data.exchange import fetch_ohlcv, monthly, weekly  # noqa: E402
 from src.grid.bot_type import decide  # noqa: E402
 from src.grid.optimizer import optimize  # noqa: E402
 from src.regime.regime import detect  # noqa: E402
-from src.signals.bottom_score import compute_all  # noqa: E402
+from src.signals.bottom_score import compute_all, compute_alt  # noqa: E402
 
 
 def main() -> None:
@@ -40,23 +38,15 @@ def main() -> None:
     daily = fetch_ohlcv(symbol=symbol, timeframe="1d")
     w, m = weekly(daily), monthly(daily)
     if is_btc:
-        valuation = onchain.get_valuation()
-        hashrate = onchain.get_hashrate()
-        miners_revenue = onchain.get_miners_revenue()
+        score, signals = compute_all(
+            daily, w, m, onchain.get_valuation(), onchain.get_hashrate(),
+            onchain.get_miners_revenue(), cfg)
     else:
-        valuation = pd.DataFrame()
-        hashrate = pd.Series(dtype=float)
-        miners_revenue = pd.Series(dtype=float)
+        score, signals = compute_alt(daily, w, m, cfg)
 
-    score, signals = compute_all(daily, w, m, valuation, hashrate, miners_revenue, cfg)
     regime = detect(daily)
     decision = decide(regime, score)
     plan = optimize(daily, decision, score, capital, cfg)
-    if not is_btc:
-        plan.warnings.insert(0, (
-            f"Senales on-chain omitidas: son especificas de BTC. El score de {symbol} "
-            "usa solo senales de precio (la validacion historica se hizo sobre BTC)."
-        ))
     price = float(daily["close"].iloc[-1])
 
     payload = (price, regime, score, decision, plan, signals, symbol)

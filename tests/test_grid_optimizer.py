@@ -14,7 +14,7 @@ def _df(closes):
     return pd.DataFrame({"open": c, "high": c * 1.02, "low": c * 0.98, "close": c})
 
 
-def test_neutral_plan_range_around_price():
+def test_neutral_plan_range_and_sltp():
     cfg = load_config()
     daily = _df(list(np.linspace(60000, 61000, 300)))
     plan = optimize(daily, BotDecision("neutral", "x"), BottomScore(50, "x"), 2000, cfg)
@@ -22,13 +22,25 @@ def test_neutral_plan_range_around_price():
     assert plan.lower < 61000 < plan.upper
     assert plan.grids >= 2
     assert plan.investment == 2000
+    assert plan.stop_loss < plan.lower        # neutral ahora tiene SL por debajo del rango
+    assert plan.take_profit > plan.upper      # y TP por encima
 
 
-def test_long_plan_liquidation_below_lower():
+def test_long_plan_sl_tp():
     cfg = load_config()
     daily = _df(list(np.linspace(80000, 60000, 300)))
     plan = optimize(daily, BotDecision("long", "x"), BottomScore(70, "x"), 2000, cfg)
     assert plan.bot_type == "long"
-    assert plan.liquidation.liq_price < plan.lower
+    assert plan.stop_loss < plan.lower
+    assert plan.take_profit > plan.upper
     assert plan.grids >= 2
     assert isinstance(plan.warnings, list)
+
+
+def test_short_plan_sl_tp():
+    cfg = load_config()
+    daily = _df(list(np.linspace(40000, 60000, 300)))
+    plan = optimize(daily, BotDecision("short", "x"), BottomScore(20, "x"), 2000, cfg)
+    assert plan.bot_type == "short"
+    assert plan.stop_loss > plan.upper        # short: SL por encima
+    assert plan.take_profit < plan.lower      # TP por debajo

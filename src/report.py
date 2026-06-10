@@ -11,7 +11,8 @@ from src.signals.price_signals import Signal
 
 _DISCLAIMER = (
     "No es asesoramiento financiero. Un grid de futuros apalancado puede liquidar tu "
-    "capital. N pequeno (3-4 ciclos): marco de gestion de riesgo, no edge demostrado."
+    "capital; revisa el precio de liquidacion que muestra Pionex al crear el bot. "
+    "N pequeno (3-4 ciclos): marco de gestion de riesgo, no edge demostrado."
 )
 
 
@@ -24,28 +25,6 @@ def _money(x: float | None) -> str:
     if abs(x) >= 1:
         return f"${x:,.2f}"
     return f"${x:,.4f}"
-
-
-def _pct(v: float, price: float) -> str:
-    return f"{(v / price - 1) * 100:+.0f}%"
-
-
-def _liq_line(plan: GridPlan, price: float) -> str:
-    """Linea de liquidacion para el CLI, etiquetada por direccion (bilateral en neutral)."""
-    liq = plan.liquidation
-    if liq.direction == "both":
-        return (f"  Liquidacion:             abajo {_money(liq.liq_price)} ({_pct(liq.liq_price, price)})"
-                f"  |  arriba {_money(liq.liq_price_up)} ({_pct(liq.liq_price_up, price)})")
-    label = "caida" if liq.direction == "down" else "subida"
-    return f"  Liquidacion ({label}):    {_money(liq.liq_price)} ({_pct(liq.liq_price, price)} vs precio)"
-
-
-def _liq_md(plan: GridPlan, price: float) -> str:
-    liq = plan.liquidation
-    if liq.direction == "both":
-        return (f"{_money(liq.liq_price)} ({_pct(liq.liq_price, price)}) abajo / "
-                f"{_money(liq.liq_price_up)} ({_pct(liq.liq_price_up, price)}) arriba")
-    return f"{_money(liq.liq_price)} ({_pct(liq.liq_price, price)})"
 
 
 def to_dict(price: float, regime: Regime, bottom: BottomScore, decision: BotDecision,
@@ -69,9 +48,6 @@ def to_dict(price: float, regime: Regime, bottom: BottomScore, decision: BotDeci
             "investment": plan.investment,
             "stop_loss": plan.stop_loss,
             "take_profit": plan.take_profit,
-            "liquidation": plan.liquidation.liq_price,
-            "liquidation_up": plan.liquidation.liq_price_up,
-            "liquidation_direction": plan.liquidation.direction,
             "net_pct_per_grid": plan.net_pct_per_grid,
             "warnings": plan.warnings,
         },
@@ -87,7 +63,6 @@ def to_json(*args, **kwargs) -> str:
 
 def to_text(price: float, regime: Regime, bottom: BottomScore, decision: BotDecision,
             plan: GridPlan, signals: list[Signal], symbol: str = "BTC/USDT") -> str:
-    liq = plan.liquidation.liq_price
     trig = "al precio actual" if plan.entry_trigger is None else _money(plan.entry_trigger)
     lines = [
         "=" * 66,
@@ -109,8 +84,8 @@ def to_text(price: float, regime: Regime, bottom: BottomScore, decision: BotDeci
         f"  Num. de grids:           {plan.grids}",
         f"  Apalancamiento:          {plan.leverage:.0f}x",
         f"  Inversion:               {_money(plan.investment)}",
-        f"  Stop Loss / Take Profit: {_money(plan.stop_loss)} / {_money(plan.take_profit)}",
-        _liq_line(plan, price),
+        f"  Stop Loss:               {_money(plan.stop_loss)}",
+        f"  Take Profit:             {_money(plan.take_profit)}",
         f"  Ganancia neta/grid:      ~{plan.net_pct_per_grid * 100:.2f}%",
     ]
     if plan.warnings:
@@ -123,7 +98,6 @@ def to_text(price: float, regime: Regime, bottom: BottomScore, decision: BotDeci
 
 def to_markdown(price: float, regime: Regime, bottom: BottomScore, decision: BotDecision,
                 plan: GridPlan, signals: list[Signal], symbol: str = "BTC/USDT") -> str:
-    liq = plan.liquidation.liq_price
     trig = "al precio actual" if plan.entry_trigger is None else _money(plan.entry_trigger)
     md = [
         f"# Recomendacion de grid — {symbol} {_money(price)}",
@@ -142,8 +116,8 @@ def to_markdown(price: float, regime: Regime, bottom: BottomScore, decision: Bot
         f"| Nº de grids | {plan.grids} |",
         f"| Apalancamiento | {plan.leverage:.0f}x |",
         f"| Inversion | {_money(plan.investment)} |",
-        f"| Stop Loss / Take Profit | {_money(plan.stop_loss)} / {_money(plan.take_profit)} |",
-        f"| Liquidacion | {_liq_md(plan, price)} |",
+        f"| Stop Loss | {_money(plan.stop_loss)} |",
+        f"| Take Profit | {_money(plan.take_profit)} |",
         f"| Ganancia neta/grid | ~{plan.net_pct_per_grid * 100:.2f}% |",
     ]
     if plan.warnings:

@@ -24,6 +24,7 @@ _WEIGHT_KEYS = {
     "Realized Price": "realized_price",
     "Hash Ribbons": "hash_ribbons",
     "Puell Multiple": "puell",
+    "Suelo de Bitcoin": "bitcoin_bottom",
 }
 
 
@@ -65,4 +66,35 @@ def compute_all(daily: pd.DataFrame, weekly: pd.DataFrame, monthly: pd.DataFrame
     price = float(daily["close"].iloc[-1])
     signals = price_signals.compute(daily, weekly, monthly, cfg)
     signals += onchain_signals.compute(valuation, hashrate, miners_revenue, price, cfg)
+    return score_from_signals(signals, cfg), signals
+
+
+def bitcoin_bottom_signal(cfg: dict) -> Signal:
+    """Senal (para alts): ¿esta BTC en zona de suelo de ciclo?
+
+    Una altcoin no hace suelo de ciclo si BTC no lo ha hecho, asi que esta senal es un
+    prerequisito. Consolida el score de suelo de BTC (precio + on-chain de la red BTC).
+    """
+    from src.data import onchain
+    from src.data.exchange import fetch_ohlcv, monthly, weekly
+
+    threshold = cfg["signals"].get("bitcoin_bottom_threshold", 60)
+    btc = fetch_ohlcv("BTC/USDT", timeframe="1d")
+    score, _ = compute_all(
+        btc, weekly(btc), monthly(btc),
+        onchain.get_valuation(), onchain.get_hashrate(), onchain.get_miners_revenue(), cfg,
+    )
+    return Signal("Suelo de Bitcoin", score.score, score.score >= threshold,
+                  f"score de suelo de BTC = {score.score} (requiere >= {threshold})")
+
+
+def compute_alt(daily: pd.DataFrame, weekly: pd.DataFrame, monthly: pd.DataFrame,
+                cfg: dict) -> tuple[BottomScore, list[Signal]]:
+    """Score de suelo para un activo que NO es BTC.
+
+    Usa las senales de PRECIO del alt + la senal requerida "Suelo de Bitcoin" (las
+    metricas on-chain son de la red de Bitcoin, no del alt, y se consolidan en ella).
+    """
+    signals = price_signals.compute(daily, weekly, monthly, cfg)
+    signals.append(bitcoin_bottom_signal(cfg))
     return score_from_signals(signals, cfg), signals

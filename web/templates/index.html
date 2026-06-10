@@ -103,8 +103,8 @@
           <div><div class="k">Apalancamiento</div><div class="v" id="lev">–</div></div>
           <div><div class="k">Inversion</div><div class="v" id="inv">–</div></div>
           <div><div class="k">Ganancia neta/grid</div><div class="v" id="netpg">–</div></div>
-          <div><div class="k">Stop Loss / Take Profit</div><div class="v" id="sltp">–</div></div>
-          <div><div class="k">Liquidacion</div><div class="v" id="liq">–</div></div>
+          <div><div class="k">Stop Loss</div><div class="v" id="sl">–</div></div>
+          <div><div class="k">Take Profit</div><div class="v" id="tp">–</div></div>
         </div>
         <div id="warnings"></div>
       </div>
@@ -168,7 +168,7 @@ function renderSignals(signals) {
 function renderChart(history, plan, price) {
   const W = 900, H = 320, padL = 64, padR = 90, padT = 16, padB = 26;
   const closes = history.map(h => h.close);
-  const levels = [plan.lower, plan.upper, plan.liquidation, plan.liquidation_up, plan.entry_trigger,
+  const levels = [plan.lower, plan.upper, plan.entry_trigger,
                   plan.stop_loss, plan.take_profit].filter(v => v !== null && v !== undefined);
   let lo = Math.min(...closes, ...levels), hi = Math.max(...closes, ...levels);
   const pad = (hi - lo) * 0.06; lo -= pad; hi += pad;
@@ -197,8 +197,6 @@ function renderChart(history, plan, price) {
     ${levelLine(plan.upper, '#2ea043', 'Sup')}
     ${levelLine(plan.lower, '#2ea043', 'Inf')}
     ${levelLine(plan.entry_trigger, '#e3b341', 'Trigger')}
-    ${levelLine(plan.liquidation, '#f85149', plan.liquidation_direction === 'both' ? 'Liq↓' : 'Liq')}
-    ${plan.liquidation_direction === 'both' ? levelLine(plan.liquidation_up, '#f85149', 'Liq↑') : ''}
     ${levelLine(plan.stop_loss, '#f85149', 'SL', '2 3')}
     ${levelLine(plan.take_profit, '#2ea043', 'TP', '2 3')}
     <line x1="${padL}" y1="${y(price).toFixed(1)}" x2="${W - padR}" y2="${y(price).toFixed(1)}"
@@ -218,13 +216,8 @@ function renderRecommendation(d) {
   $("lev").textContent = p.leverage.toFixed(0) + "x";
   $("inv").textContent = money(p.investment);
   $("netpg").textContent = "~" + (p.net_pct_per_grid * 100).toFixed(2) + "%";
-  $("sltp").textContent = money(p.stop_loss) + " / " + money(p.take_profit);
-  const pctOf = (v) => { const x = (v / d.price - 1) * 100; return (x > 0 ? "+" : "") + x.toFixed(0) + "%"; };
-  if (p.liquidation_direction === "both") {
-    $("liq").innerHTML = "↓ " + money(p.liquidation) + " (" + pctOf(p.liquidation) + ") &nbsp;·&nbsp; ↑ " + money(p.liquidation_up) + " (" + pctOf(p.liquidation_up) + ")";
-  } else {
-    $("liq").textContent = money(p.liquidation) + " (" + pctOf(p.liquidation) + ")";
-  }
+  $("sl").textContent = money(p.stop_loss);
+  $("tp").textContent = money(p.take_profit);
   $("warnings").innerHTML = (p.warnings || []).map(w => `<div class="warn">⚠ ${w}</div>`).join("");
 }
 
