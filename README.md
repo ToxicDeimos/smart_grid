@@ -8,7 +8,7 @@ El sistema responde a dos preguntas:
    precio y on-chain en un score de confluencia.
 2. **¿Qué bot de grid montar y con qué parámetros?** — tipo de bot (Long / Short / Neutral),
    zona de entrada / trigger, rango (límites inferior/superior), nº de grids, apalancamiento,
-   SL/TP y **precio de liquidación** calculado.
+   Stop Loss y Take Profit. (La liquidación la calcula Pionex al crear el bot.)
 
 Es un **recomendador**: calcula y muestra los parámetros; tú los introduces en Pionex a mano.
 No ejecuta órdenes (la API de futuros de Pionex es *invite-only*).
@@ -46,6 +46,11 @@ No ejecuta órdenes (la API de futuros de Pionex es *invite-only*).
 
 Si una fuente falla, su señal se omite del score, que **renormaliza** los pesos del resto.
 
+**Altcoins (no BTC):** el score usa las señales de precio del propio activo **más** una
+señal requerida **"Suelo de Bitcoin"** (peso alto). Una altcoin no hace suelo de ciclo si
+BTC no lo ha hecho, así que actúa de _gate_; las métricas on-chain (de la red Bitcoin) se
+consolidan en ella.
+
 ---
 
 ## Instalación
@@ -81,19 +86,18 @@ python scripts/backtest_signals.py
 python web/app.py     # luego abre http://127.0.0.1:5000
 ```
 
-Panel interactivo (Flask): termómetro de suelo, las 9 señales, recomendación de bot
-(rango, grids, apalancamiento, liquidación, avisos) y un gráfico del precio con los
+Panel interactivo (Flask): termómetro de suelo, las señales, recomendación de bot
+(rango, grids, apalancamiento, SL/TP, avisos) y un gráfico del precio con los
 niveles del grid marcados. Inputs de capital y símbolo.
 
 ## Estructura
 
 ```
 src/
-  data/        # ccxt (mercado) + Coin Metrics / hashrate (on-chain) + cache
-  signals/     # señales de precio, on-chain y score de confluencia
+  data/        # ccxt (mercado) + bitcoin-data.com / blockchain.info (on-chain) + cache
+  signals/     # señales de precio, on-chain, Suelo de Bitcoin y score de confluencia
   regime/      # tendencia vs rango
-  grid/        # tipo de bot + optimizador de parametros
-  liquidation.py  # precio de liquidacion del futures grid
+  grid/        # tipo de bot + optimizador de parametros (rango, grids, SL/TP)
   report.py    # ensambla la recomendacion
 scripts/       # CLIs: bottom_dashboard, run_recommendation, backtest_signals
 config/        # config.yaml (umbrales, pesos, fees)
@@ -108,7 +112,8 @@ Todos los umbrales de señales, pesos del score, fees y restricciones de Pionex
 ## Estado
 
 **v1 funcional** con las 9 señales activas (5 de precio + 4 on-chain, todas gratis y sin
-key). Detector de suelos, score de confluencia, régimen, tipo de bot y optimizador de grid
-con liquidación, todo cableado en `bottom_dashboard.py` y `run_recommendation.py`.
+key) más la señal **Suelo de Bitcoin** para altcoins. Detector de suelos, score de
+confluencia, régimen, tipo de bot y optimizador de grid (rango, grids, SL/TP), todo cableado
+en `bottom_dashboard.py`, `run_recommendation.py` y el panel web.
 Sanity-check histórico: score **83/100** en el suelo de dic-2018, **82/100** en nov-2022
 y **0/100** en el techo de 2021.
