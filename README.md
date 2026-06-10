@@ -38,11 +38,12 @@ No ejecuta órdenes (la API de futuros de Pionex es *invite-only*).
 - **RSI mensual**
 - **Bull Market Support Band** (20W SMA + 21W EMA)
 
-**On-chain** (Coin Metrics Community API + APIs de hashrate, gratis):
-- **MVRV Z-Score**
-- **Realized Price** (precio < realized = capitulación)
-- **Hash Ribbons** (capitulación de mineros + recuperación)
-- **Puell Multiple** (ingresos de mineros)
+**On-chain** (blockchain.info, gratis y sin key):
+- **Hash Ribbons** (capitulación de mineros + recuperación) ✅
+- **Puell Multiple** (ingresos de mineros) ✅
+- **MVRV Z-Score** y **Realized Price** — implementados, pero requieren una fuente con
+  API key (Coin Metrics Pro / BGeometrics); sin ella se omiten del score, que
+  **renormaliza** los pesos de las señales disponibles.
 
 ---
 
@@ -95,4 +96,9 @@ Todos los umbrales de señales, pesos del score, fees y restricciones de Pionex
 
 ## Estado
 
-En desarrollo (v1). Roadmap por fases en el historial de commits.
+**v1 funcional.** Detector de suelos (precio + on-chain de mineros), score de
+confluencia, régimen, tipo de bot y optimizador de grid con liquidación, todo cableado
+en `bottom_dashboard.py` y `run_recommendation.py`. Sanity-check histórico: score
+**83/100** en el suelo de dic-2018, **74/100** en nov-2022 y **0/100** en el techo de 2021.
+
+Pendiente (fase 2): MVRV / Realized Price con una fuente de datos con key.
