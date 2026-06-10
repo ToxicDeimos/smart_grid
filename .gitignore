@@ -1,0 +1,24 @@
+# Entornos virtuales
+venv/
+.venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# Datos cacheados y logs (no versionar)
+data/
+logs/
+*.parquet
+
+# Secretos
+.env
+
+# SO / editores
+.DS_Store
+.idea/
+.vscode/

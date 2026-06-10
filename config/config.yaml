@@ -1,0 +1,66 @@
+# ============================================================
+# smart_grid — configuracion
+# ============================================================
+
+# Capital y mercado
+capital_usdt: 2000
+symbol: "BTC/USDT"             # par para analisis de ciclo (Binance spot via ccxt)
+exchange: "binance"
+perp_symbol: "BTC/USDT:USDT"   # perpetual para el rango operativo (opcional)
+
+# Comisiones (Pionex futures, aproximado)
+fees:
+  taker: 0.0005   # 0.05%
+  maker: 0.0002   # 0.02%
+
+# Restricciones de Pionex
+pionex:
+  min_leverage: 3                 # apalancamiento minimo forzado por Pionex
+  maintenance_margin_rate: 0.005  # ~0.5%, para el calculo de liquidacion
+
+# Datos
+data:
+  cache_dir: "data"
+  cache_ttl_hours: 12             # refrescar datos cacheados pasadas N horas
+  history_start: "2017-01-01"     # inicio de historia para analisis de ciclo
+
+# ------------------------------------------------------------
+# Senales de suelo de ciclo — umbrales de "zona de suelo"
+# ------------------------------------------------------------
+signals:
+  mayer_multiple_floor: 0.80       # Mayer (precio/200DMA) < 0.80 => suelo
+  drawdown_floor_pct: -0.70        # drawdown desde ATH <= -70% => suelo
+  rsi_monthly_floor: 35            # RSI mensual < 35 => suelo
+  mvrv_z_floor: 0.50               # MVRV Z-Score < 0.50 => zona verde
+  realized_price_ratio_floor: 1.0  # precio/realized < 1 => capitulacion
+  puell_floor: 0.50                # Puell Multiple < 0.50 => suelo
+  # Hash Ribbons y BMSB son senales booleanas (cruce / perdida-recuperacion)
+
+# ------------------------------------------------------------
+# Pesos del score de confluencia (0-100, deben sumar 100)
+# ------------------------------------------------------------
+weights:
+  below_200wma: 12
+  mayer_multiple: 13
+  drawdown: 10
+  rsi_monthly: 10
+  bmsb: 10
+  mvrv_z: 15
+  realized_price: 15
+  hash_ribbons: 8
+  puell: 7
+
+# Etiquetas cualitativas segun score
+score_labels:
+  - { min: 75, label: "Zona de suelo de alta probabilidad" }
+  - { min: 50, label: "Acercandose a zona de suelo" }
+  - { min: 25, label: "Territorio intermedio" }
+  - { min: 0,  label: "Lejos de suelo (posible distribucion/techo)" }
+
+# ------------------------------------------------------------
+# Optimizador de grid
+# ------------------------------------------------------------
+grid:
+  min_net_pct_per_grid: 0.003   # ganancia neta objetivo por grid (0.3%) tras fees
+  atr_period: 14
+  swing_lookback: 90            # barras para detectar swing highs/lows
