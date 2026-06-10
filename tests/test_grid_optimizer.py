@@ -14,7 +14,7 @@ def _df(closes):
     return pd.DataFrame({"open": c, "high": c * 1.02, "low": c * 0.98, "close": c})
 
 
-def test_neutral_plan_range_and_sltp():
+def test_neutral_plan_range_sl_breakeven():
     cfg = load_config()
     daily = _df(list(np.linspace(60000, 61000, 300)))
     plan = optimize(daily, BotDecision("neutral", "x"), BottomScore(50, "x"), 2000, cfg)
@@ -22,8 +22,9 @@ def test_neutral_plan_range_and_sltp():
     assert plan.lower < 61000 < plan.upper
     assert plan.grids >= 2
     assert plan.investment == 2000
-    assert plan.stop_loss < plan.lower        # neutral ahora tiene SL por debajo del rango
-    assert plan.take_profit > plan.upper      # y TP por encima
+    assert plan.stop_loss < plan.lower                 # SL por debajo del rango
+    assert plan.take_profit is None                    # neutral: TP por rondas, no de precio
+    assert plan.lower < plan.break_even < plan.upper   # cierre en el equilibrio (centro)
 
 
 def test_long_plan_sl_tp():

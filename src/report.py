@@ -27,6 +27,13 @@ def _money(x: float | None) -> str:
     return f"${x:,.4f}"
 
 
+def _tp_line(plan: GridPlan) -> str:
+    """Linea de Take Profit (direccional) o de cierre en equilibrio (neutral)."""
+    if plan.take_profit is not None:
+        return f"  Take Profit:             {_money(plan.take_profit)}"
+    return f"  Cierre (equilibrio):     {_money(plan.break_even)}  (TP por rondas de arbitraje)"
+
+
 def to_dict(price: float, regime: Regime, bottom: BottomScore, decision: BotDecision,
             plan: GridPlan, signals: list[Signal], symbol: str = "BTC/USDT") -> dict:
     return {
@@ -48,6 +55,7 @@ def to_dict(price: float, regime: Regime, bottom: BottomScore, decision: BotDeci
             "investment": plan.investment,
             "stop_loss": plan.stop_loss,
             "take_profit": plan.take_profit,
+            "break_even": plan.break_even,
             "net_pct_per_grid": plan.net_pct_per_grid,
             "warnings": plan.warnings,
         },
@@ -85,7 +93,7 @@ def to_text(price: float, regime: Regime, bottom: BottomScore, decision: BotDeci
         f"  Apalancamiento:          {plan.leverage:.0f}x",
         f"  Inversion:               {_money(plan.investment)}",
         f"  Stop Loss:               {_money(plan.stop_loss)}",
-        f"  Take Profit:             {_money(plan.take_profit)}",
+        _tp_line(plan),
         f"  Ganancia neta/grid:      ~{plan.net_pct_per_grid * 100:.2f}%",
     ]
     if plan.warnings:
@@ -117,7 +125,8 @@ def to_markdown(price: float, regime: Regime, bottom: BottomScore, decision: Bot
         f"| Apalancamiento | {plan.leverage:.0f}x |",
         f"| Inversion | {_money(plan.investment)} |",
         f"| Stop Loss | {_money(plan.stop_loss)} |",
-        f"| Take Profit | {_money(plan.take_profit)} |",
+        (f"| Take Profit | {_money(plan.take_profit)} |" if plan.take_profit is not None
+         else f"| Cierre (equilibrio) | {_money(plan.break_even)} (TP por rondas) |"),
         f"| Ganancia neta/grid | ~{plan.net_pct_per_grid * 100:.2f}% |",
     ]
     if plan.warnings:

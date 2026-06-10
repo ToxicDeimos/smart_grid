@@ -2,11 +2,14 @@
 
 A partir del OHLCV, el tipo de bot decidido y el score de suelo, calcula: rango
 (limites inferior/superior), trigger de entrada, numero de grids, apalancamiento,
-Stop Loss y Take Profit, con avisos de riesgo.
+Stop Loss, y Take Profit / precio de equilibrio, con avisos de riesgo.
 
-La liquidacion NO se estima aqui: depende del margen (incl. margen adicional) y del
-modelo propietario de Pionex, y un grid neutral esta muy cubierto. Pionex muestra el
-precio de liquidacion real al crear el bot.
+Notas sobre Pionex:
+- La liquidacion la calcula Pionex al crear el bot (depende del margen, incl. margen
+  adicional, y de su modelo); aqui no se estima.
+- En un grid NEUTRAL, el Take Profit NO es un precio sobre el rango: Pionex cierra al
+  volver al precio de equilibrio (centro) mediante "rondas de arbitraje". Por eso para
+  neutral se reporta el precio de equilibrio como objetivo de cierre, no un TP de precio.
 """
 from __future__ import annotations
 
@@ -29,8 +32,9 @@ class GridPlan:
     leverage: float
     investment: float
     stop_loss: float | None
-    take_profit: float | None
+    take_profit: float | None        # long/short: precio objetivo. neutral: None
     net_pct_per_grid: float
+    break_even: float | None = None  # neutral: precio de equilibrio / objetivo de cierre
     warnings: list[str] = field(default_factory=list)
     rationale: str = ""
 
@@ -53,6 +57,14 @@ def _price_step(price: float) -> float:
 
 def _round_to(x: float, step: float) -> float:
     return round(x / step) * step
+
+
+def _fmt(x: float) -> str:
+    if abs(x) >= 1000:
+        return f"{x:,.0f}"
+    if abs(x) >= 1:
+        return f"{x:,.2f}"
+    return f"{x:,.4f}"
 
 
 def _grids_for_range(lower: float, upper: float, net_pct: float, fee: float) -> int:
@@ -79,6 +91,8 @@ def optimize(daily: pd.DataFrame, decision: BotDecision, bottom: BottomScore,
     tp_pct = cfg["grid"]["tp_pct"]
 
     side = decision.bot_type
+    break_even: float | None = None
+    warnings: list[str] = []
 
     if side == "long":
         lower = _round_to(swing_low, step)
@@ -97,13 +111,18 @@ def optimize(daily: pd.DataFrame, decision: BotDecision, bottom: BottomScore,
         upper = _round_to(price + 2 * atr, step)
         trigger = None
         stop_loss = _round_to(lower * (1 - sl_pct), step)
-        take_profit = _round_to(upper * (1 + tp_pct), step)
+        take_profit = None                                   # el TP neutral no es de precio
+        break_even = _round_to((lower + upper) / 2, step)     # cierre al volver al equilibrio
+        warnings.append(
+            f"Take Profit (neutral): en Pionex se configura por RONDAS de arbitraje, no por "
+            f"precio. Cierra al volver al equilibrio (~${_fmt(break_even)}) sin arrastrar PnL "
+            "de tendencia; mas rondas = mas ganancia acumulada pero mas tiempo expuesto."
+        )
 
     grids = _grids_for_range(lower, upper, net_target, fee)
     spacing_real = (upper / lower) ** (1 / grids) - 1
     net_pct = spacing_real - 2 * fee
 
-    warnings: list[str] = []
     if lev <= cfg["pionex"]["min_leverage"]:
         warnings.append(
             f"Apalancamiento {lev:.0f}x (minimo de Pionex). Revisa el precio de liquidacion "
@@ -123,6 +142,7 @@ def optimize(daily: pd.DataFrame, decision: BotDecision, bottom: BottomScore,
         stop_loss=stop_loss,
         take_profit=take_profit,
         net_pct_per_grid=round(net_pct, 5),
+        break_even=break_even,
         warnings=warnings,
         rationale=decision.rationale,
     )
