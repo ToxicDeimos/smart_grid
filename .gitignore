@@ -21,3 +21,6 @@ __pycache__/
 .DS_Store
 .idea/
 .vscode/
+
+# Config local de preview (rutas absolutas de la maquina)
+.claude/launch.json

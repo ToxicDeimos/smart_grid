@@ -75,6 +75,16 @@ python scripts/run_recommendation.py --capital 2000 --symbol BTC/USDT
 python scripts/backtest_signals.py
 ```
 
+### Panel web
+
+```bash
+python web/app.py     # luego abre http://127.0.0.1:5000
+```
+
+Panel interactivo (Flask): termómetro de suelo, las 9 señales, recomendación de bot
+(rango, grids, apalancamiento, liquidación, avisos) y un gráfico del precio con los
+niveles del grid marcados. Inputs de capital y símbolo.
+
 ## Estructura
 
 ```
