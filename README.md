@@ -57,8 +57,10 @@ consolidan en ella.
 
 ```bash
 python -m venv venv
-# Windows:
+# Windows (CMD / PowerShell):
 venv\Scripts\activate
+# Windows (Git Bash):
+source venv/Scripts/activate
 # Linux/Mac:
 source venv/bin/activate
 
