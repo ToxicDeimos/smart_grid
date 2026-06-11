@@ -9,7 +9,34 @@ Parametros fijados a priori (no tuneados al resultado) para no sobreajustar.
 """
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
+
+
+def block_near(daily: pd.DataFrame, level: float, lookback: int = 365,
+               bins: int = 40, tol: float = 0.03, density_q: float = 0.70) -> bool:
+    """¿Hay un BLOQUE (zona de alta densidad de cierres = zona de valor) cerca de `level`?
+
+    Construye un perfil de cuantas velas cerraron en cada banda de precio en la ventana;
+    una banda con densidad alta (>= cuantil density_q) y dentro de tol% de `level` es una
+    confluencia bloque-nivel.
+    """
+    win = daily.tail(lookback)["close"].to_numpy()
+    if len(win) < 30:
+        return False
+    lo, hi = float(win.min()), float(win.max())
+    if hi <= lo:
+        return False
+    hist, edges = np.histogram(win, bins=bins, range=(lo, hi))
+    nz = hist[hist > 0]
+    if nz.size == 0:
+        return False
+    thr = np.quantile(nz, density_q)
+    for i, count in enumerate(hist):
+        center = (edges[i] + edges[i + 1]) / 2
+        if count >= thr and abs(center - level) / level <= tol:
+            return True
+    return False
 
 
 def pivots(df: pd.DataFrame, k: int = 5) -> tuple[list[float], list[float]]:
