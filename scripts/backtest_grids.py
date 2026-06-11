@@ -99,7 +99,7 @@ def report(results: list) -> None:
         reasons[r.exit_reason] += 1
     print(f"  Cierres: {dict(reasons)}")
     print("=" * 72)
-    print("  Aproximacion (rejilla long, close 1h). Pocos regimenes: sanity-check, no promesa.")
+    print("  Resolucion intra-barra (high/low 1h; puede sobre-estimar rondas). Sanity-check.")
 
 
 if __name__ == "__main__":
