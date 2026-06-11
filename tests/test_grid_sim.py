@@ -45,3 +45,19 @@ def test_flat_no_rounds():
     plan = _plan(56000, 66000, 20, side="neutral", sl=53000, be=61000)
     res = simulate_grid(_prices(closes), plan, 61000, cfg)
     assert res.rounds == 0
+
+
+def test_long_captures_uptrend():
+    cfg = load_config()
+    closes = list(np.linspace(61000, 68000, 200))  # tendencia alcista pura
+    plan = _plan(56000, 66000, 20, side="long", sl=53000, tp=70000)
+    res = simulate_grid(_prices(closes), plan, 61000, cfg)
+    assert res.pnl > 0   # el grid long gana con la tendencia a favor (antes daba ~0)
+
+
+def test_short_captures_downtrend():
+    cfg = load_config()
+    closes = list(np.linspace(61000, 54000, 200))  # tendencia bajista pura
+    plan = _plan(56000, 66000, 20, side="short", sl=70000, tp=53000)
+    res = simulate_grid(_prices(closes), plan, 61000, cfg)
+    assert res.pnl > 0   # el grid short gana con la tendencia bajista a favor
