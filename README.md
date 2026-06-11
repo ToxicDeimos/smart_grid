@@ -1,6 +1,13 @@
 # smart_grid
 
-Detector de **suelos de ciclo** de Bitcoin + **optimizador de grids de futuros** para Pionex.
+Detector de **suelos de ciclo** de Bitcoin + herramientas de **acumulación spot** y grids, para Pionex.
+
+> **⚠️ Hallazgo clave de la investigación** ([docs/RESEARCH.md](docs/RESEARCH.md)): tras un
+> backtesting exhaustivo con validación out-of-sample, **ningún grid bate a comprar y mantener
+> BTC** — el edge de BTC es su drift alcista y el grid lo destruye (el apalancado por la cola, el
+> spot por vender pronto). Lo que **sí** funciona es el **DCA inteligente**: acumular spot
+> ponderando por el score de suelo de ciclo (ROI +71.5% vs +50.4% del DCA plano). Prueba
+> `python scripts/run_dca.py --base 100`.
 
 El sistema responde a dos preguntas:
 
@@ -74,6 +81,9 @@ No hace falta ninguna clave API en v1: todas las fuentes de datos son públicas/
 ```bash
 # Termómetro de suelo actual (cada señal + score 0-100, incluye la 200WMA de hoy)
 python scripts/bottom_dashboard.py
+
+# DCA inteligente: cuanto comprar BTC spot hoy segun el score (lo que SI tiene edge)
+python scripts/run_dca.py --base 100
 
 # Recomendación completa de bot de grid para un capital dado
 python scripts/run_recommendation.py --capital 2000 --symbol BTC/USDT
