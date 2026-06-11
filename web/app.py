@@ -18,6 +18,7 @@ from src import report  # noqa: E402
 from src.config import load_config  # noqa: E402
 from src.data import onchain  # noqa: E402
 from src.data.exchange import fetch_ohlcv, monthly, weekly  # noqa: E402
+from src.dca import recommend  # noqa: E402
 from src.grid.bot_type import decide  # noqa: E402
 from src.grid.optimizer import optimize  # noqa: E402
 from src.regime.regime import detect  # noqa: E402
@@ -61,6 +62,10 @@ def api_analysis():
 
         data = report.to_dict(price, regime, score, decision, plan, signals, symbol)
         data["date"] = str(daily.index[-1].date())
+        dca_base = float(request.args.get("dca_base", 100))
+        rec = recommend(score.score, dca_base)
+        data["dca"] = {"base": dca_base, "multiplier": rec.multiplier,
+                       "amount": rec.amount, "label": rec.label}
         hist = daily["close"].tail(180)
         data["price_history"] = [
             {"date": d.strftime("%Y-%m-%d"), "close": round(float(c), 2)}
