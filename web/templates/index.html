@@ -89,28 +89,8 @@
         </div>
       </div>
 
-      <!-- Recomendacion -->
-      <div class="card">
-        <h2>Recomendacion de bot</h2>
-        <div style="margin-bottom:14px;">
-          <span id="botType" class="pill neutral">–</span>
-          <span id="rationale" style="color:var(--muted);font-size:12.5px;margin-left:8px;"></span>
-        </div>
-        <div class="rec-grid">
-          <div><div class="k">Activacion</div><div class="v" id="trigger">–</div></div>
-          <div><div class="k">Rango</div><div class="v" id="range">–</div></div>
-          <div><div class="k">Nº de grids</div><div class="v" id="grids">–</div></div>
-          <div><div class="k">Apalancamiento</div><div class="v" id="lev">–</div></div>
-          <div><div class="k">Inversion</div><div class="v" id="inv">–</div></div>
-          <div><div class="k">Ganancia neta/grid</div><div class="v" id="netpg">–</div></div>
-          <div><div class="k">Stop Loss</div><div class="v" id="sl">–</div></div>
-          <div><div class="k" id="tpLabel">Take Profit</div><div class="v" id="tp">–</div></div>
-        </div>
-        <div id="warnings"></div>
-      </div>
-
       <!-- DCA inteligente -->
-      <div class="card full" style="border-color: var(--accent);">
+      <div class="card" style="border-color: var(--accent);">
         <h2>DCA inteligente — acumulación spot (lo que SÍ tiene edge)</h2>
         <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;">
           <label style="font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:3px;">Aportación base (USDT)
@@ -125,7 +105,7 @@
 
       <!-- Grafico de precio con niveles -->
       <div class="card full">
-        <h2>Precio (180d) y niveles del grid</h2>
+        <h2>Precio de BTC — 180 dias</h2>
         <svg id="chart" viewBox="0 0 900 320" width="100%"></svg>
       </div>
 
@@ -139,8 +119,9 @@
       </div>
     </div>
     <p class="disclaimer">
-      No es asesoramiento financiero. Un grid de futuros apalancado puede liquidar tu capital.
-      N pequeno (3-4 ciclos): marco de gestion de riesgo por valoracion extrema, no edge demostrado.
+      No es asesoramiento financiero. El detector de suelos es un marco de gestion de riesgo por
+      valoracion extrema (N pequeno, 3-4 ciclos), no un edge garantizado. El DCA inteligente esta
+      validado frente al DCA plano (ver docs/RESEARCH.md), pero el pasado no garantiza el futuro.
     </p>
   </div>
 </main>
@@ -187,28 +168,16 @@ function renderSignals(signals) {
     </tr>`).join("");
 }
 
-function renderChart(history, plan, price) {
+function renderChart(history, price) {
   const W = 900, H = 320, padL = 64, padR = 90, padT = 16, padB = 26;
   const closes = history.map(h => h.close);
-  const levels = [plan.lower, plan.upper, plan.entry_trigger,
-                  plan.stop_loss, plan.take_profit, plan.break_even].filter(v => v !== null && v !== undefined);
-  let lo = Math.min(...closes, ...levels), hi = Math.max(...closes, ...levels);
+  let lo = Math.min(...closes), hi = Math.max(...closes);
   const pad = (hi - lo) * 0.06; lo -= pad; hi += pad;
   const n = closes.length;
   const x = (i) => padL + (i / (n - 1)) * (W - padL - padR);
   const y = (v) => padT + (1 - (v - lo) / (hi - lo)) * (H - padT - padB);
-
   const line = closes.map((c, i) => `${i === 0 ? 'M' : 'L'} ${x(i).toFixed(1)} ${y(c).toFixed(1)}`).join(" ");
   const area = `${line} L ${x(n - 1).toFixed(1)} ${H - padB} L ${padL} ${H - padB} Z`;
-
-  const levelLine = (v, color, label, dash) => {
-    if (v === null || v === undefined) return "";
-    const yy = y(v).toFixed(1);
-    return `<line x1="${padL}" y1="${yy}" x2="${W - padR}" y2="${yy}" stroke="${color}"
-              stroke-width="1.3" stroke-dasharray="${dash || '4 4'}" opacity="0.9"/>
-            <text x="${W - padR + 6}" y="${yy}" dy="3.5" style="fill:${color}">${label} ${money(v)}</text>`;
-  };
-
   $("chart").innerHTML = `
     <defs><linearGradient id="g" x1="0" x2="0" y1="0" y2="1">
       <stop offset="0" stop-color="#2f81f7" stop-opacity="0.25"/>
@@ -216,38 +185,9 @@ function renderChart(history, plan, price) {
     </linearGradient></defs>
     <path d="${area}" fill="url(#g)"/>
     <path d="${line}" fill="none" stroke="#2f81f7" stroke-width="1.6"/>
-    ${levelLine(plan.upper, '#2ea043', 'Sup')}
-    ${levelLine(plan.lower, '#2ea043', 'Inf')}
-    ${levelLine(plan.entry_trigger, '#e3b341', 'Trigger')}
-    ${levelLine(plan.stop_loss, '#f85149', 'SL', '2 3')}
-    ${levelLine(plan.take_profit, '#2ea043', 'TP', '2 3')}
-    ${levelLine(plan.break_even, '#8b949e', 'Equil.', '2 3')}
     <line x1="${padL}" y1="${y(price).toFixed(1)}" x2="${W - padR}" y2="${y(price).toFixed(1)}"
           stroke="#e6edf3" stroke-width="1" opacity="0.5"/>
     <text x="${W - padR + 6}" y="${y(price).toFixed(1)}" dy="3.5" style="fill:#e6edf3">Precio ${money(price)}</text>`;
-}
-
-function renderRecommendation(d) {
-  const p = d.plan;
-  const bt = $("botType");
-  bt.textContent = d.bot_type.toUpperCase();
-  bt.className = "pill " + d.bot_type;
-  $("rationale").textContent = d.rationale;
-  $("trigger").textContent = p.entry_trigger ? money(p.entry_trigger) : "al precio actual";
-  $("range").textContent = money(p.lower) + " – " + money(p.upper);
-  $("grids").textContent = p.grids;
-  $("lev").textContent = p.leverage.toFixed(0) + "x";
-  $("inv").textContent = money(p.investment);
-  $("netpg").textContent = "~" + (p.net_pct_per_grid * 100).toFixed(2) + "%";
-  $("sl").textContent = money(p.stop_loss);
-  if (p.take_profit !== null && p.take_profit !== undefined) {
-    $("tpLabel").textContent = "Take Profit";
-    $("tp").textContent = money(p.take_profit);
-  } else {
-    $("tpLabel").textContent = "Cierre (equilibrio)";
-    $("tp").innerHTML = money(p.break_even) + ' <span style="color:var(--muted);font-weight:400;font-size:11px;">· TP por rondas</span>';
-  }
-  $("warnings").innerHTML = (p.warnings || []).map(w => `<div class="warn">⚠ ${w}</div>`).join("");
 }
 
 async function analyze() {
@@ -269,9 +209,8 @@ async function analyze() {
     const reg = $("regime"); reg.textContent = d.regime.trend + " (ADX " + d.regime.adx + ")";
     const active = d.signals.filter(s => s.floor).length;
     $("activeCount").textContent = active + " / " + d.signals.length;
-    renderRecommendation(d);
     renderSignals(d.signals);
-    renderChart(d.price_history, d.plan, d.price);
+    renderChart(d.price_history, d.price);
     _dca = d.dca; updateDca();
 
     $("status").style.display = "none"; $("content").style.display = "block";
